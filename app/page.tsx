@@ -85,7 +85,7 @@ export default function Home() {
             {/* Student Inputs Section */}
             <div>
               <label className="block text-lg font-semibold text-gray-700 mb-2">
-                Other Students' Inputs (Optional)
+                Other Students&apos; Inputs (Optional)
               </label>
               <textarea
                 value={studentInputs}
@@ -131,7 +131,7 @@ export default function Home() {
                 <li>Sentence 1: Major takeaway with biology language</li>
                 <li>Sentence 2: Detail or twist that caught your attention</li>
                 <li>Sentence 3: Connection to textbook or additional resources</li>
-                <li>Additional sentences incorporating other students' insights</li>
+                <li>Additional sentences incorporating other students&apos; insights</li>
               </ul>
             </div>
           </div>
