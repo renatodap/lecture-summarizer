@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  // Dynamic import to prevent build-time loading
-  const pdf = (await import('pdf-parse')).default;
   try {
+    // Dynamic import to prevent build-time loading
+    const pdf = (await import('pdf-parse')).default;
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -17,7 +18,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
+    const fileName = file.name.toLowerCase();
+    console.log('Parsing PDF:', fileName);
+
+    if (!fileName.endsWith('.pdf')) {
       return NextResponse.json(
         { error: 'File must be a PDF' },
         { status: 400 }
@@ -28,9 +32,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    console.log('PDF buffer size:', buffer.length);
+
     // Parse PDF
     const data = await pdf(buffer);
     const text = data.text;
+
+    console.log('PDF parsing complete. Text length:', text?.length || 0);
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json(
@@ -39,11 +47,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text: text.trim() });
   } catch (error) {
     console.error('PDF parsing error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to parse PDF. Please make sure it contains readable text.' },
+      { error: `Failed to parse PDF: ${errorMessage}` },
       { status: 500 }
     );
   }
