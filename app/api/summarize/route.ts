@@ -4,9 +4,9 @@ export async function POST(request: NextRequest) {
   try {
     const { lectureContent, studentInputs } = await request.json();
 
-    if (!lectureContent) {
+    if (!lectureContent || lectureContent.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Lecture content is required' },
+        { error: 'Please add some lecture content first' },
         { status: 400 }
       );
     }
@@ -14,8 +14,9 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
+      console.error('GROQ_API_KEY not found in environment variables');
       return NextResponse.json(
-        { error: 'API key not configured. Please add GROQ_API_KEY to your .env.local file' },
+        { error: 'API key not configured. Please contact the administrator.' },
         { status: 500 }
       );
     }
@@ -31,7 +32,7 @@ REQUIRED FORMAT:
 STYLE GUIDELINES:
 - Write in first person ("I learned", "I was surprised", "I found")
 - Use casual academic tone
-- Keep the summary concise but substantive
+- Keep the summary concise but substantive (3-4 sentences minimum)
 - Include specific scientific terms and concepts
 - Make connections between concepts
 - Show curiosity and engagement with the material`;
@@ -63,22 +64,38 @@ Write a complete lecture summary following the BIO 101 format. Make it personal 
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Groq API error:', error);
+      const errorText = await response.text();
+      console.error('Groq API error:', response.status, errorText);
+
+      if (response.status === 401) {
+        return NextResponse.json(
+          { error: 'Invalid API key. Please contact the administrator.' },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
-        { error: 'Failed to generate summary. Please check your API key and try again.' },
+        { error: 'AI service is temporarily unavailable. Please try again.' },
         { status: 500 }
       );
     }
 
     const data = await response.json();
-    const summary = data.choices[0]?.message?.content || 'Failed to generate summary';
+    const summary = data.choices[0]?.message?.content;
+
+    if (!summary) {
+      console.error('No summary in response:', data);
+      return NextResponse.json(
+        { error: 'No summary was generated. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ summary });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Unexpected error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { error: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
   }

@@ -1,30 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export default function Home() {
   const [lectureContent, setLectureContent] = useState('');
   const [studentInputs, setStudentInputs] = useState('');
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fileName, setFileName] = useState('');
+  const [error, setError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = async (file: File) => {
+    if (!file.name.endsWith('.txt')) {
+      setError('Please upload a .txt file');
+      return;
+    }
 
-    setFileName(file.name);
-    const text = await file.text();
-    setLectureContent(text);
+    try {
+      const text = await file.text();
+      setLectureContent(text);
+      setError('');
+    } catch {
+      setError('Failed to read file. Please try again.');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
   };
 
   const generateSummary = async () => {
     if (!lectureContent.trim()) {
-      alert('Please provide lecture content');
+      setError('Please add lecture content first');
       return;
     }
 
     setLoading(true);
+    setError('');
     setSummary('');
 
     try {
@@ -34,107 +60,174 @@ export default function Home() {
         body: JSON.stringify({ lectureContent, studentInputs }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate summary');
-
       const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to generate summary');
+        return;
+      }
+
       setSummary(data.summary);
-    } catch (error) {
-      alert('Error generating summary. Please try again.');
-      console.error(error);
+    } catch {
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">
-            Lecture Summary Generator
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Generate a 5-minute lecture summary in BIO 101 format
-          </p>
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(summary);
+    alert('Copied to clipboard!');
+  };
 
-          <div className="space-y-6">
-            {/* Lecture Content Section */}
-            <div>
-              <label className="block text-lg font-semibold text-gray-700 mb-2">
-                Lecture Content
-              </label>
-              <div className="mb-3">
-                <input
-                  type="file"
-                  accept=".txt,.pdf"
-                  onChange={handleFileUpload}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                />
-                {fileName && (
-                  <p className="mt-2 text-sm text-green-600">Loaded: {fileName}</p>
-                )}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            BIO 101 Lecture Summarizer
+          </h1>
+          <p className="text-gray-600">Generate your lecture summary in seconds</p>
+        </div>
+
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-6">
+
+          {/* Step 1: Lecture Content */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold">
+                1
+              </span>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Add Lecture Content
+              </h2>
+            </div>
+
+            {/* File Upload Area */}
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-indigo-500 bg-indigo-50'
+                  : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                className="hidden"
+              />
+              <div className="space-y-2">
+                <div className="text-4xl">📄</div>
+                <p className="text-lg font-medium text-gray-700">
+                  Drop a .txt file here or click to browse
+                </p>
+                <p className="text-sm text-gray-500">
+                  Upload your lecture notes as a text file
+                </p>
               </div>
+            </div>
+
+            {/* Text Input */}
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 mb-2">Or paste your content:</p>
               <textarea
                 value={lectureContent}
                 onChange={(e) => setLectureContent(e.target.value)}
-                placeholder="Or paste lecture content here..."
-                className="w-full h-48 p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none"
+                placeholder="Paste your lecture notes here..."
+                rows={8}
+                className="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none text-gray-900"
               />
-            </div>
-
-            {/* Student Inputs Section */}
-            <div>
-              <label className="block text-lg font-semibold text-gray-700 mb-2">
-                Other Students&apos; Inputs (Optional)
-              </label>
-              <textarea
-                value={studentInputs}
-                onChange={(e) => setStudentInputs(e.target.value)}
-                placeholder="Enter what other students mentioned in class discussion..."
-                className="w-full h-32 p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none"
-              />
-            </div>
-
-            {/* Generate Button */}
-            <button
-              onClick={generateSummary}
-              disabled={loading || !lectureContent.trim()}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold rounded-lg shadow-lg transition-colors duration-200 text-lg"
-            >
-              {loading ? 'Generating Summary...' : 'Generate Summary'}
-            </button>
-
-            {/* Summary Output */}
-            {summary && (
-              <div className="mt-6">
-                <label className="block text-lg font-semibold text-gray-700 mb-2">
-                  Your Lecture Summary
-                </label>
-                <div className="p-6 bg-green-50 border-2 border-green-300 rounded-lg">
-                  <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
-                    {summary}
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(summary)}
-                  className="mt-3 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium"
-                >
-                  Copy to Clipboard
-                </button>
-              </div>
-            )}
-
-            {/* Format Guide */}
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h3 className="font-semibold text-gray-700 mb-2">Summary Format:</h3>
-              <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-                <li>Sentence 1: Major takeaway with biology language</li>
-                <li>Sentence 2: Detail or twist that caught your attention</li>
-                <li>Sentence 3: Connection to textbook or additional resources</li>
-                <li>Additional sentences incorporating other students&apos; insights</li>
-              </ul>
             </div>
           </div>
+
+          {/* Step 2: Student Inputs (Optional) */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-400 text-white text-sm font-bold">
+                2
+              </span>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Add Classmate Insights <span className="text-gray-500 text-sm font-normal">(Optional)</span>
+              </h2>
+            </div>
+            <textarea
+              value={studentInputs}
+              onChange={(e) => setStudentInputs(e.target.value)}
+              placeholder="Example: Sarah mentioned that telomeres shorten with age. Mike found an article about SNPs affecting alcohol tolerance..."
+              rows={4}
+              className="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none text-gray-900"
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+              <p className="text-red-700 font-medium">⚠️ {error}</p>
+            </div>
+          )}
+
+          {/* Generate Button */}
+          <button
+            onClick={generateSummary}
+            disabled={loading || !lectureContent.trim()}
+            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg transition-all text-lg"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Generating Summary...
+              </span>
+            ) : (
+              'Generate Summary'
+            )}
+          </button>
+
+          {/* Summary Output */}
+          {summary && (
+            <div className="space-y-3 animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">✅</span>
+                <h3 className="text-xl font-semibold text-gray-900">Your Summary</h3>
+              </div>
+              <div className="p-6 bg-green-50 border-2 border-green-300 rounded-xl">
+                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {summary}
+                </p>
+              </div>
+              <button
+                onClick={copyToClipboard}
+                className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors"
+              >
+                📋 Copy to Clipboard
+              </button>
+            </div>
+          )}
+
+          {/* Format Guide */}
+          <details className="mt-6">
+            <summary className="cursor-pointer text-indigo-600 font-medium hover:text-indigo-700">
+              📖 Summary Format Guide
+            </summary>
+            <div className="mt-3 p-4 bg-gray-50 rounded-xl text-sm text-gray-700 space-y-2">
+              <p><strong>Sentence 1:</strong> Major takeaway with biology terminology</p>
+              <p><strong>Sentence 2:</strong> Interesting detail that caught your attention</p>
+              <p><strong>Sentence 3:</strong> Connection to textbook or research</p>
+              <p><strong>Additional:</strong> Reference classmate insights if provided</p>
+            </div>
+          </details>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-6 text-sm text-gray-600">
+          <p>Powered by AI • Optimized for BIO 101 format</p>
         </div>
       </div>
     </div>
