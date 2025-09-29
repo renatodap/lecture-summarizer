@@ -32,10 +32,11 @@ REQUIRED FORMAT:
 STYLE GUIDELINES:
 - Write in first person ("I learned", "I was surprised", "I found")
 - Use casual academic tone
-- Keep the summary concise but substantive (3-4 sentences minimum)
+- KEEP IT SHORT AND CONCISE - exactly 3-4 sentences total (no more!)
 - Include specific scientific terms and concepts
 - Make connections between concepts
-- Show curiosity and engagement with the material`;
+- Show curiosity and engagement with the material
+- This should be quick to read and write - designed for a 5-minute summary`;
 
     const userPrompt = `Create a lecture summary based on this lecture content:
 
@@ -44,7 +45,7 @@ ${lectureContent}
 
 ${studentInputs ? `OTHER STUDENTS' INPUTS:\n${studentInputs}\n` : ''}
 
-Write a complete lecture summary following the BIO 101 format. Make it personal and engaging while maintaining academic rigor.`;
+Write a complete lecture summary following the BIO 101 format. Make it personal and engaging while maintaining academic rigor. IMPORTANT: Keep it to EXACTLY 3-4 sentences total - no more. This is meant to be quick to write in under 5 minutes.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -59,7 +60,7 @@ Write a complete lecture summary following the BIO 101 format. Make it personal 
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 300,
       }),
     });
 

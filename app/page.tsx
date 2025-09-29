@@ -12,17 +12,69 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (file: File) => {
-    if (!file.name.endsWith('.txt')) {
-      setError('Please upload a .txt file');
+    const fileName = file.name.toLowerCase();
+
+    // Check file type
+    const isText = fileName.endsWith('.txt');
+    const isPDF = fileName.endsWith('.pdf');
+    const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].some(ext => fileName.endsWith(ext));
+
+    if (!isText && !isPDF && !isImage) {
+      setError('Please upload a .txt, .pdf, or image file (PNG, JPG, etc.)');
       return;
     }
 
+    setError('');
+    setLoading(true);
+
     try {
-      const text = await file.text();
+      let text = '';
+
+      if (isText) {
+        text = await file.text();
+      } else if (isPDF) {
+        // Send PDF to API for parsing
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/parse-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to parse PDF');
+        }
+
+        const data = await response.json();
+        text = data.text;
+      } else if (isImage) {
+        // Send image to API for OCR
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/parse-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to extract text from image');
+        }
+
+        const data = await response.json();
+        text = data.text;
+      }
+
       setLectureContent(text);
       setError('');
-    } catch {
-      setError('Failed to read file. Please try again.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to read file. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -120,17 +172,17 @@ export default function Home() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt"
+                accept=".txt,.pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp"
                 onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
                 className="hidden"
               />
               <div className="space-y-2">
                 <div className="text-4xl">📄</div>
                 <p className="text-lg font-medium text-gray-700">
-                  Drop a .txt file here or click to browse
+                  Drop a file here or click to browse
                 </p>
                 <p className="text-sm text-gray-500">
-                  Upload your lecture notes as a text file
+                  .txt, .pdf, or images (PNG, JPG, etc.)
                 </p>
               </div>
             </div>
