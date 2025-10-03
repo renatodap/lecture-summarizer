@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { paperContent, newsArticleUrl } = await request.json();
+    const { paperContent } = await request.json();
 
     if (!paperContent || paperContent.trim().length === 0) {
       return NextResponse.json(
@@ -22,9 +22,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If news article URL is provided, use Perplexity to research it
+    // Use Perplexity to find and research a relevant news article
     let newsArticleContent = '';
-    if (newsArticleUrl && perplexityApiKey) {
+    let suggestedArticleUrl = '';
+
+    if (perplexityApiKey) {
       try {
         const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
@@ -37,25 +39,45 @@ export async function POST(request: NextRequest) {
             messages: [
               {
                 role: 'system',
-                content: 'You are a helpful assistant that extracts and summarizes scientific news articles. Focus on the key biological findings and experimental approaches.'
+                content: 'You are a helpful assistant that finds and summarizes recent scientific news articles from Science Daily, The Conversation, or Eureka Alert that relate to biology research papers.'
               },
               {
                 role: 'user',
-                content: `Please read and summarize the key biological findings from this article: ${newsArticleUrl}. Include: 1) The main result/discovery, 2) The biological concepts involved, 3) Any experimental methods mentioned.`
+                content: `Based on this research paper, find a recent news article from Science Daily, The Conversation, or Eureka Alert that covers related biological concepts. Provide: 1) The article URL, 2) The main result/discovery, 3) The biological concepts involved.
+
+RESEARCH PAPER:
+${paperContent.substring(0, 3000)}
+
+Format your response as:
+URL: [article url]
+SUMMARY: [your summary]`
               }
             ],
             temperature: 0.3,
-            max_tokens: 1000,
+            max_tokens: 1500,
           }),
         });
 
         if (perplexityResponse.ok) {
           const perplexityData = await perplexityResponse.json();
-          newsArticleContent = perplexityData.choices[0]?.message?.content || '';
+          const content = perplexityData.choices[0]?.message?.content || '';
+
+          // Extract URL and content
+          const urlMatch = content.match(/URL:\s*(https?:\/\/[^\s]+)/i);
+          if (urlMatch) {
+            suggestedArticleUrl = urlMatch[1];
+          }
+
+          const summaryMatch = content.match(/SUMMARY:\s*(.+)/is);
+          if (summaryMatch) {
+            newsArticleContent = summaryMatch[1].trim();
+          } else {
+            newsArticleContent = content;
+          }
         }
       } catch (error) {
         console.error('Perplexity API error:', error);
-        // Continue without news article content
+        // Continue without news article - will skip Q2
       }
     }
 
@@ -132,9 +154,9 @@ Write like a college student explaining the experiment to a classmate. Be clear 
     const q1Part2Data = await q1Part2Response.json();
     const logic = q1Part2Data.choices[0]?.message?.content || '';
 
-    // Question 2: News Article Connection
+    // Question 2: News Article Connection (only if Perplexity succeeded)
     let newsConnection = '';
-    if (newsArticleUrl) {
+    if (newsArticleContent) {
       const q2Prompt = `You're a BIO 101 student writing a reading quiz response. Based on the research paper and news article, write exactly 3-5 sentences (no fewer, no more) that:
 
 1. First, describe the key result/finding from the news article in your own words
@@ -143,7 +165,8 @@ Write like a college student explaining the experiment to a classmate. Be clear 
 RESEARCH PAPER COVERED IN CLASS:
 ${paperContent}
 
-${newsArticleContent ? `NEWS ARTICLE:\n${newsArticleContent}` : `NEWS ARTICLE URL:\n${newsArticleUrl}\n(Note: Make intelligent connections based on what articles from Science Daily, The Conversation, or Eureka Alerts typically cover)`}
+NEWS ARTICLE:
+${newsArticleContent}
 
 IMPORTANT WRITING STYLE:
 - Sound like a college student, not a textbook or AI
@@ -176,14 +199,13 @@ IMPORTANT WRITING STYLE:
 
       const q2Data = await q2Response.json();
       newsConnection = q2Data.choices[0]?.message?.content || '';
-    } else {
-      newsConnection = 'Please provide a news article URL to generate this response.';
     }
 
     return NextResponse.json({
       essentialResult,
       logic,
       newsConnection,
+      suggestedArticleUrl,
     });
   } catch (error) {
     console.error('Unexpected error:', error);

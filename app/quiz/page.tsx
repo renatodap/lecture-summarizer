@@ -5,11 +5,11 @@ import Link from 'next/link';
 
 export default function QuizResponse() {
   const [paperContent, setPaperContent] = useState('');
-  const [newsArticleUrl, setNewsArticleUrl] = useState('');
   const [response, setResponse] = useState<{
     essentialResult: string;
     logic: string;
     newsConnection: string;
+    suggestedArticleUrl?: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +94,7 @@ export default function QuizResponse() {
       const response = await fetch('/api/quiz-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paperContent: content, newsArticleUrl }),
+        body: JSON.stringify({ paperContent: content }),
       });
 
       const data = await response.json();
@@ -217,26 +217,47 @@ export default function QuizResponse() {
             </div>
           </div>
 
-          {/* Step 2: News Article URL (Optional) */}
+          {/* Step 2: News Source Links */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-400 text-white text-sm font-bold">
                 2
               </span>
               <h2 className="text-xl font-semibold text-gray-900">
-                News Article URL <span className="text-gray-500 text-sm font-normal">(Optional)</span>
+                Find a Related News Article
               </h2>
             </div>
-            <input
-              type="url"
-              value={newsArticleUrl}
-              onChange={(e) => setNewsArticleUrl(e.target.value)}
-              placeholder="https://www.sciencedaily.com/..."
-              className="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none text-gray-900"
-            />
-            <p className="text-sm text-gray-500 mt-2">
-              From Science Daily, The Conversation, or Eureka Alerts
-            </p>
+            <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl space-y-3">
+              <p className="text-gray-700 text-sm">
+                Browse these sources for a biology article related to the paper:
+              </p>
+              <div className="space-y-2">
+                <a
+                  href="https://www.sciencedaily.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 bg-white hover:bg-blue-100 rounded-lg border border-blue-300 transition-colors"
+                >
+                  <span className="font-medium text-blue-700">🔬 Science Daily</span>
+                </a>
+                <a
+                  href="https://theconversation.com/us/topics/biology-86"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 bg-white hover:bg-blue-100 rounded-lg border border-blue-300 transition-colors"
+                >
+                  <span className="font-medium text-blue-700">💬 The Conversation</span>
+                </a>
+                <a
+                  href="https://www.eurekalert.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 bg-white hover:bg-blue-100 rounded-lg border border-blue-300 transition-colors"
+                >
+                  <span className="font-medium text-blue-700">📰 Eureka Alert</span>
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* Error Message */}
@@ -303,44 +324,53 @@ export default function QuizResponse() {
                 </button>
               </div>
 
-              {/* Question 2: News Connection */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">🔗</span>
-                  <h3 className="text-xl font-semibold text-gray-900">Q2: News Article Connection</h3>
-                </div>
-                <div className="p-6 bg-purple-50 border-2 border-purple-300 rounded-xl">
-                  <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                    {response.newsConnection}
-                  </p>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(response.newsConnection)}
-                  className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-colors"
-                >
-                  📋 Copy
-                </button>
-              </div>
+              {/* Question 2: News Connection - Only show if available */}
+              {response.newsConnection && (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🔗</span>
+                      <h3 className="text-xl font-semibold text-gray-900">Q2: News Article Connection</h3>
+                    </div>
+                    <div className="p-6 bg-purple-50 border-2 border-purple-300 rounded-xl">
+                      <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                        {response.newsConnection}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(response.newsConnection)}
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-colors"
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
 
-              {/* URL Field Reminder */}
-              {newsArticleUrl && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🔗</span>
-                    <h3 className="text-xl font-semibold text-gray-900">Article URL</h3>
-                  </div>
-                  <div className="p-6 bg-gray-50 border-2 border-gray-300 rounded-xl">
-                    <p className="text-gray-800 leading-relaxed break-all">
-                      {newsArticleUrl}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(newsArticleUrl)}
-                    className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
-                  >
-                    📋 Copy URL
-                  </button>
-                </div>
+                  {/* Suggested Article URL */}
+                  {response.suggestedArticleUrl && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">🔗</span>
+                        <h3 className="text-xl font-semibold text-gray-900">Suggested Article URL</h3>
+                      </div>
+                      <div className="p-6 bg-gray-50 border-2 border-gray-300 rounded-xl">
+                        <a
+                          href={response.suggestedArticleUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 underline break-all"
+                        >
+                          {response.suggestedArticleUrl}
+                        </a>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(response.suggestedArticleUrl)}
+                        className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
+                      >
+                        📋 Copy URL
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
