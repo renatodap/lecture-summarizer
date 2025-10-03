@@ -39,22 +39,28 @@ export async function POST(request: NextRequest) {
             messages: [
               {
                 role: 'system',
-                content: 'You are a helpful assistant that finds and summarizes recent scientific news articles from Science Daily, The Conversation, or Eureka Alert that relate to biology research papers.'
+                content: 'You are a helpful assistant that searches for and finds specific scientific news articles from Science Daily (sciencedaily.com), The Conversation (theconversation.com), or Eureka Alert (eurekalert.org). You must provide actual, specific article URLs, not generic homepages.'
               },
               {
                 role: 'user',
-                content: `Based on this research paper, find a recent news article from Science Daily, The Conversation, or Eureka Alert that covers related biological concepts. Provide: 1) The article URL, 2) The main result/discovery, 3) The biological concepts involved.
+                content: `Search the web and find ONE specific, recent news article from Science Daily, The Conversation, or Eureka Alert that relates to the biological concepts in this research paper.
 
-RESEARCH PAPER:
+RESEARCH PAPER SUMMARY:
 ${paperContent.substring(0, 3000)}
 
-Format your response as:
-URL: [article url]
-SUMMARY: [your summary]`
+IMPORTANT REQUIREMENTS:
+1. Search for an ACTUAL article - you must provide a full, specific article URL (not just "sciencedaily.com")
+2. The URL must be a real, published article that you found through web search
+3. The article should relate to similar biological concepts (genetics, proteins, molecular biology, cell biology, etc.)
+4. Read the article and summarize its key findings
+
+Format your response EXACTLY as:
+URL: [full specific article URL including the path, e.g., https://www.sciencedaily.com/releases/2024/01/240115123456.htm]
+SUMMARY: [detailed summary of the article's key biological findings and methods]`
               }
             ],
-            temperature: 0.3,
-            max_tokens: 1500,
+            temperature: 0.2,
+            max_tokens: 2000,
           }),
         });
 
@@ -62,17 +68,36 @@ SUMMARY: [your summary]`
           const perplexityData = await perplexityResponse.json();
           const content = perplexityData.choices[0]?.message?.content || '';
 
+          console.log('Perplexity response:', content);
+
           // Extract URL and content
           const urlMatch = content.match(/URL:\s*(https?:\/\/[^\s]+)/i);
           if (urlMatch) {
-            suggestedArticleUrl = urlMatch[1];
-          }
+            const extractedUrl = urlMatch[1];
 
-          const summaryMatch = content.match(/SUMMARY:\s*([\s\S]*)/i);
-          if (summaryMatch) {
-            newsArticleContent = summaryMatch[1].trim();
-          } else {
-            newsArticleContent = content;
+            // Validate that it's a specific article URL, not just a homepage
+            const isValidArticle = (
+              (extractedUrl.includes('sciencedaily.com/releases/') ||
+               extractedUrl.includes('theconversation.com/') && extractedUrl.split('/').length > 4 ||
+               extractedUrl.includes('eurekalert.org/news-releases/')) &&
+              !extractedUrl.endsWith('.com') &&
+              !extractedUrl.endsWith('.com/') &&
+              !extractedUrl.endsWith('.org') &&
+              !extractedUrl.endsWith('.org/')
+            );
+
+            if (isValidArticle) {
+              suggestedArticleUrl = extractedUrl;
+
+              const summaryMatch = content.match(/SUMMARY:\s*([\s\S]*)/i);
+              if (summaryMatch) {
+                newsArticleContent = summaryMatch[1].trim();
+              } else {
+                newsArticleContent = content;
+              }
+            } else {
+              console.log('Invalid article URL (homepage detected):', extractedUrl);
+            }
           }
         }
       } catch (error) {
