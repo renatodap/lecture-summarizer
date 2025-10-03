@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const [lectureContent, setLectureContent] = useState('');
@@ -141,6 +142,12 @@ export default function Home() {
             BIO 101 Lecture Summarizer
           </h1>
           <p className="text-gray-600">Generate your lecture summary in seconds</p>
+          <Link
+            href="/quiz"
+            className="inline-block mt-4 text-purple-600 hover:text-purple-700 font-medium"
+          >
+            → Go to Reading Quiz Helper
+          </Link>
         </div>
 
         {/* Main Card */}
