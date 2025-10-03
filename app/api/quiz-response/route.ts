@@ -60,15 +60,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate responses using Groq
-    const systemPrompt = `You are a helpful assistant that creates responses for BIO 101 reading quiz questions. You provide thoughtful, biologically accurate answers that demonstrate understanding of scientific papers and their connections to broader biological concepts.`;
+    const systemPrompt = `You are a college student in BIO 101 writing reading quiz responses. Write naturally like a student would - clear and accurate, but conversational and genuine. Avoid overly formal or flowery language. Sound like you actually read and understood the paper, not like you're trying to impress anyone.`;
 
     // Question 1 Part 1: Essential Result
-    const q1Part1Prompt = `Based on this research paper, write ONE sentence describing in your own words the most essential result. Focus only on what the result is, not why it's important.
+    const q1Part1Prompt = `Based on this research paper, write ONE sentence describing in your own words the most essential result. Don't explain why it's important, just state what the result is.
 
 PAPER CONTENT:
 ${paperContent}
 
-Provide ONLY one clear, concise sentence.`;
+Write like a college student - straightforward and clear. Use simple, direct language. Provide ONLY one sentence.`;
 
     const q1Part1Response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -82,7 +82,7 @@ Provide ONLY one clear, concise sentence.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: q1Part1Prompt }
         ],
-        temperature: 0.6,
+        temperature: 0.8,
         max_tokens: 150,
       }),
     });
@@ -95,7 +95,10 @@ Provide ONLY one clear, concise sentence.`;
     const essentialResult = q1Part1Data.choices[0]?.message?.content || '';
 
     // Question 1 Part 2: Experimental Logic
-    const q1Part2Prompt = `Based on this research paper, summarize in 2-3 sentences the experimental logic that led to the essential result. Focus on the big picture approach: what was the comparison of interest, how was the response variable determined, and what approach allowed them to discover this result?
+    const q1Part2Prompt = `Based on this research paper, summarize in 2-3 sentences the experimental logic that led to the essential result. Focus on the big picture:
+- What comparison did they make?
+- What did they measure (response variable)?
+- What was their overall approach?
 
 PAPER CONTENT:
 ${paperContent}
@@ -103,7 +106,7 @@ ${paperContent}
 ESSENTIAL RESULT:
 ${essentialResult}
 
-Provide 2-3 clear sentences explaining the logic.`;
+Write like a college student explaining the experiment to a classmate. Be clear and straightforward - focus on WHAT they did, not fancy descriptions. Use 2-3 sentences, no more.`;
 
     const q1Part2Response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -117,8 +120,8 @@ Provide 2-3 clear sentences explaining the logic.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: q1Part2Prompt }
         ],
-        temperature: 0.6,
-        max_tokens: 250,
+        temperature: 0.8,
+        max_tokens: 300,
       }),
     });
 
@@ -132,16 +135,23 @@ Provide 2-3 clear sentences explaining the logic.`;
     // Question 2: News Article Connection
     let newsConnection = '';
     if (newsArticleUrl) {
-      const q2Prompt = `Based on this research paper and the news article information, write 3-5 good sentences that:
-1. Describe what you perceive as the key result of the news article
-2. Explain the connection you see to the research paper using biological language
+      const q2Prompt = `You're a BIO 101 student writing a reading quiz response. Based on the research paper and news article, write exactly 3-5 sentences (no fewer, no more) that:
 
-RESEARCH PAPER:
+1. First, describe the key result/finding from the news article in your own words
+2. Then, explain the biological connection you see between the news article and the research paper
+
+RESEARCH PAPER COVERED IN CLASS:
 ${paperContent}
 
-${newsArticleContent ? `NEWS ARTICLE CONTENT:\n${newsArticleContent}` : `NEWS ARTICLE URL:\n${newsArticleUrl}\n(Note: Could not fetch article content automatically. Please make reasonable connections based on the URL and typical content from Science Daily, The Conversation, or Eureka Alerts)`}
+${newsArticleContent ? `NEWS ARTICLE:\n${newsArticleContent}` : `NEWS ARTICLE URL:\n${newsArticleUrl}\n(Note: Make intelligent connections based on what articles from Science Daily, The Conversation, or Eureka Alerts typically cover)`}
 
-Write in first person ("I found...", "I see a connection...") and use biological terminology. Provide 3-5 sentences, no fewer, no more.`;
+IMPORTANT WRITING STYLE:
+- Sound like a college student, not a textbook or AI
+- Use specific biological terms and concepts (genes, proteins, pathways, mechanisms, etc.)
+- Be thoughtful but natural - like you're explaining to a friend who also took the class
+- Don't be overly formal or use phrases like "fascinating" or "remarkable"
+- Make genuine, specific connections using proper biological language
+- Keep it to 3-5 sentences exactly`;
 
       const q2Response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -155,8 +165,8 @@ Write in first person ("I found...", "I see a connection...") and use biological
             { role: 'system', content: systemPrompt },
             { role: 'user', content: q2Prompt }
           ],
-          temperature: 0.7,
-          max_tokens: 400,
+          temperature: 0.85,
+          max_tokens: 500,
         }),
       });
 
