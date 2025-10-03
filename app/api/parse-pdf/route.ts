@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Force dynamic rendering to avoid build-time issues with pdf-parse
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
@@ -25,24 +24,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to buffer
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'API key not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Convert PDF to base64 for Groq vision API
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-    console.log('PDF buffer size:', buffer.length);
+    console.log('PDF size:', arrayBuffer.byteLength, 'bytes');
 
-    // Dynamic import pdf-parse
-    const pdf = (await import('pdf-parse/lib/pdf-parse.js')).default;
+    // Use Groq vision model to extract text from PDF
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-90b-vision-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract all text from this PDF document. Return only the raw text content, no explanations or formatting.'
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:application/pdf;base64,${base64}`
+                }
+              }
+            ]
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 8000,
+      }),
+    });
 
-    // Parse PDF
-    const data = await pdf(buffer);
-    const text = data.text;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Groq API error:', response.status, errorText);
+      return NextResponse.json(
+        { error: 'Failed to parse PDF with AI' },
+        { status: 500 }
+      );
+    }
+
+    const data = await response.json();
+    const text = data.choices[0]?.message?.content;
 
     console.log('PDF parsing complete. Text length:', text?.length || 0);
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json(
-        { error: 'No text found in PDF. The file might be empty or contain only images.' },
+        { error: 'No text found in PDF' },
         { status: 400 }
       );
     }
