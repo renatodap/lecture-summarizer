@@ -363,7 +363,7 @@ export default function QuizResponse() {
                         </a>
                       </div>
                       <button
-                        onClick={() => copyToClipboard(response.suggestedArticleUrl)}
+                        onClick={() => copyToClipboard(response.suggestedArticleUrl || '')}
                         className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-medium transition-colors"
                       >
                         📋 Copy URL
