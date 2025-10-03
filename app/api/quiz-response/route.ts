@@ -68,7 +68,7 @@ SUMMARY: [your summary]`
             suggestedArticleUrl = urlMatch[1];
           }
 
-          const summaryMatch = content.match(/SUMMARY:\s*(.+)/is);
+          const summaryMatch = content.match(/SUMMARY:\s*([\s\S]*)/i);
           if (summaryMatch) {
             newsArticleContent = summaryMatch[1].trim();
           } else {
