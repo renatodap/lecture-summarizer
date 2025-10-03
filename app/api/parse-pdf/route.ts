@@ -5,9 +5,6 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    // Dynamic import to prevent build-time loading
-    const pdf = (await import('pdf-parse')).default;
-
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -33,6 +30,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     console.log('PDF buffer size:', buffer.length);
+
+    // Dynamic import pdf-parse
+    const pdf = (await import('pdf-parse/lib/pdf-parse.js')).default;
 
     // Parse PDF
     const data = await pdf(buffer);
