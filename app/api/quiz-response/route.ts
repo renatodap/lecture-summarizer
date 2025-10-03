@@ -26,8 +26,17 @@ export async function POST(request: NextRequest) {
     let newsArticleContent = '';
     let suggestedArticleUrl = '';
 
+    if (!perplexityApiKey) {
+      console.error('PERPLEXITY_API_KEY not configured');
+      return NextResponse.json(
+        { error: 'Perplexity API key not configured. Please add PERPLEXITY_API_KEY to environment variables.' },
+        { status: 500 }
+      );
+    }
+
     if (perplexityApiKey) {
       try {
+        console.log('Calling Perplexity API to find Science Daily article...');
         const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
           headers: {
@@ -69,39 +78,49 @@ SUMMARY: Researchers discovered that...`
           }),
         });
 
-        if (perplexityResponse.ok) {
-          const perplexityData = await perplexityResponse.json();
-          const content = perplexityData.choices[0]?.message?.content || '';
+        if (!perplexityResponse.ok) {
+          const errorText = await perplexityResponse.text();
+          console.error('Perplexity API error:', perplexityResponse.status, errorText);
+          throw new Error(`Perplexity API failed: ${perplexityResponse.status}`);
+        }
 
-          console.log('Perplexity response:', content);
+        const perplexityData = await perplexityResponse.json();
+        const content = perplexityData.choices[0]?.message?.content || '';
 
-          // Extract URL and content
-          const urlMatch = content.match(/URL:\s*(https?:\/\/[^\s]+)/i);
-          if (urlMatch) {
-            const extractedUrl = urlMatch[1];
+        console.log('Perplexity raw response:', content);
 
-            // Validate that it's a Science Daily article URL, not just a homepage
-            const isValidScienceDailyArticle = (
-              extractedUrl.includes('sciencedaily.com/releases/') &&
-              !extractedUrl.endsWith('.com') &&
-              !extractedUrl.endsWith('.com/')
-            );
+        // Extract URL and content
+        const urlMatch = content.match(/URL:\s*(https?:\/\/[^\s\)]+)/i);
+        if (urlMatch) {
+          const extractedUrl = urlMatch[1].replace(/\)$/, ''); // Remove trailing parenthesis if present
 
-            if (isValidScienceDailyArticle) {
-              suggestedArticleUrl = extractedUrl;
+          console.log('Extracted URL:', extractedUrl);
 
-              const summaryMatch = content.match(/SUMMARY:\s*([\s\S]*)/i);
-              if (summaryMatch) {
-                newsArticleContent = summaryMatch[1].trim();
-              } else {
-                newsArticleContent = content;
-              }
+          // Validate that it's a Science Daily article URL, not just a homepage
+          const isValidScienceDailyArticle = (
+            extractedUrl.includes('sciencedaily.com/releases/') &&
+            !extractedUrl.endsWith('.com') &&
+            !extractedUrl.endsWith('.com/')
+          );
 
-              console.log('Valid Science Daily article found:', extractedUrl);
+          if (isValidScienceDailyArticle) {
+            suggestedArticleUrl = extractedUrl;
+
+            const summaryMatch = content.match(/SUMMARY:\s*([\s\S]*)/i);
+            if (summaryMatch) {
+              newsArticleContent = summaryMatch[1].trim();
             } else {
-              console.log('Invalid article URL (not a Science Daily article):', extractedUrl);
+              newsArticleContent = content;
             }
+
+            console.log('✓ Valid Science Daily article found:', extractedUrl);
+          } else {
+            console.log('✗ Invalid article URL (not a valid Science Daily article):', extractedUrl);
+            throw new Error('Perplexity did not return a valid Science Daily article URL');
           }
+        } else {
+          console.log('✗ No URL found in Perplexity response');
+          throw new Error('Perplexity did not return a URL');
         }
       } catch (error) {
         console.error('Perplexity API error:', error);
@@ -109,57 +128,13 @@ SUMMARY: Researchers discovered that...`
       }
     }
 
-    // Fallback: If Perplexity didn't find a valid article, use Groq to suggest a plausible article
-    if (!suggestedArticleUrl && apiKey) {
-      try {
-        console.log('Using Groq fallback to suggest Science Daily article...');
-
-        const fallbackResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a helpful assistant that identifies relevant Science Daily topics based on research papers.'
-              },
-              {
-                role: 'user',
-                content: `Based on this research paper excerpt, suggest what type of Science Daily article would be most relevant and create a realistic article summary about related biological research.
-
-RESEARCH PAPER EXCERPT:
-${paperContent.substring(0, 2000)}
-
-Create a realistic summary of a Science Daily article that would relate to this research. Focus on similar biological concepts (metabolism, nutrition, genetics, proteins, etc.).
-
-Format:
-SUMMARY: [Detailed summary of a hypothetical but realistic Science Daily article covering related biological research, including key findings and biological mechanisms]`
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 1000,
-          }),
-        });
-
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          const fallbackContent = fallbackData.choices[0]?.message?.content || '';
-
-          const summaryMatch = fallbackContent.match(/SUMMARY:\s*([\s\S]*)/i);
-          if (summaryMatch) {
-            newsArticleContent = summaryMatch[1].trim();
-            // Set a generic Science Daily URL as placeholder since we couldn't find a specific one
-            suggestedArticleUrl = 'https://www.sciencedaily.com/';
-            console.log('Groq fallback generated article summary');
-          }
-        }
-      } catch (fallbackError) {
-        console.error('Groq fallback error:', fallbackError);
-      }
+    // If Perplexity didn't find a valid article, return an error
+    if (!suggestedArticleUrl) {
+      console.error('Failed to find a valid Science Daily article');
+      return NextResponse.json(
+        { error: 'Could not find a relevant Science Daily article. Please check that PERPLEXITY_API_KEY is configured correctly.' },
+        { status: 500 }
+      );
     }
 
     // Generate responses using Groq
